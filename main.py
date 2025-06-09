@@ -21,17 +21,6 @@ RATING_COLNAME = 'rating'
 MIN_RATING_CONST = 0.0
 MAX_RATING_CONST = 5.0
 
-
-def getopenconnection(user=DB_USER_PG_DEFAULT, password=DB_PASS_PG_DEFAULT, dbname=DATABASE_NAME,
-                      host=DB_HOST_PG_DEFAULT, port=DB_PORT_PG_DEFAULT):
-    try:
-        conn = psycopg2.connect(dbname=dbname, user=user, password=password, host=host, port=port)
-        return conn
-    except psycopg2.Error as e:
-        print(f"🚫 Error connecting to PostgreSQL: {e}")
-        raise 
-
-
 def getopenconnection(user=DB_USER_PG_DEFAULT, password=DB_PASS_PG_DEFAULT, dbname=DATABASE_NAME, host=DB_HOST_PG_DEFAULT, port=DB_PORT_PG_DEFAULT):
     try:
         conn = psycopg2.connect(dbname=dbname, user=user, password=password, host=host, port=port)
@@ -191,7 +180,105 @@ def roundrobinpartition(ratingsTableName, numberOfPartitions, openconnection):
         cursor.execute("INSERT INTO " + target_table + " (UserID, MovieID, Rating) VALUES (%s, %s, %s)", row)
     openconnection.commit()
 
+def rangeinsert(ratingsTableName, userid, movieid, rating, openconnection):
+    actual_base_table_name = ratingsTableName.lower()
+    MovieID = movieid
+    RatingVal = float(rating)
+    UserID = userid
+    print(f"Performing Range Insert: UserID={UserID}, MovieID={MovieID}, Rating={RatingVal}")
+    conn = openconnection
+    if not conn or conn.closed:
+        raise Exception("Range_Insert: Invalid or closed database connection provided.")
+    try:
+        with conn.cursor() as cur:
+            insert_original_sql = f'INSERT INTO {actual_base_table_name} ({USER_ID_COLNAME}, {MOVIE_ID_COLNAME}, {RATING_COLNAME}) VALUES (%s, %s, %s);'
+            _execute_query_pg_with_provided_conn(conn, insert_original_sql, (UserID, MovieID, RatingVal))
+            print(f"Inserted into main table '{actual_base_table_name}'.")
+            num_partitions = _count_partitions_with_prefix(conn, RANGE_TABLE_PREFIX)
+            if num_partitions == 0:
+                print("No range partitions found. Skipping insert into partition.")
+                if not conn.autocommit: conn.commit()
+                return
+            target_part_table_name = None
+            if num_partitions == 1:
+                target_part_table_name = f"{RANGE_TABLE_PREFIX}0"
+                if not (MIN_RATING_CONST <= RatingVal <= MAX_RATING_CONST):
+                    print(
+                        f"Warning: Rating {RatingVal} is outside the defined range [{MIN_RATING_CONST}, {MAX_RATING_CONST}]. Skipping insert into partition.")
+                    if not conn.autocommit: conn.commit()
+                    return
+            else:
+                range_step = (MAX_RATING_CONST - MIN_RATING_CONST) / num_partitions
+                if range_step == 0:
+                    raise ValueError("Range step is zero during Range_Insert. Check partition configuration.")
+                determined_index = -1
+                current_lower_bound = MIN_RATING_CONST
+                for i in range(num_partitions):
+                    current_upper_bound = MIN_RATING_CONST + (i + 1) * range_step
+                    if i == num_partitions - 1:  
+                        current_upper_bound = MAX_RATING_CONST
+                    if i == 0:
+                        if RatingVal >= current_lower_bound and RatingVal <= current_upper_bound:
+                            determined_index = i
+                            break
+                    else: 
+                        if RatingVal > current_lower_bound and RatingVal <= current_upper_bound:
+                            determined_index = i
+                            break
+                    current_lower_bound = current_upper_bound
+                if determined_index != -1:
+                    target_part_table_name = f"{RANGE_TABLE_PREFIX}{determined_index}"
+                else:
+                    print(
+                        f"Warning: Rating {RatingVal} does not fall into any defined range partition. Skipping insert into partition.")
+                    if not conn.autocommit: conn.commit()
+                    return
+            if target_part_table_name:
+                print(f"Data will be inserted into partition '{target_part_table_name}' for Rating {RatingVal}.")
+                insert_partition_sql = f'INSERT INTO {target_part_table_name} ({USER_ID_COLNAME}, {MOVIE_ID_COLNAME}, {RATING_COLNAME}) VALUES (%s, %s, %s);'
+                _execute_query_pg_with_provided_conn(conn, insert_partition_sql, (UserID, MovieID, RatingVal))
+                print(f"Successfully inserted into partition '{target_part_table_name}'.")
+
+            if not conn.autocommit:
+                conn.commit()
+    except Exception as e:
+        print(f"Error during Range_Insert: {e}")
+        if not conn.autocommit and conn and not conn.closed and conn.status == psycopg2.extensions.STATUS_IN_ERROR:
+            try:
+                conn.rollback()
+            except psycopg2.Error:
+                pass
+        raise
+
+
+def roundrobininsert(ratingsTableName, userid, movieid, rating, openconnection):
+    cursor = openconnection.cursor()
+    cursor.execute(
+        f"INSERT INTO {ratingsTableName} (UserID, MovieID, Rating) VALUES (%s, %s, %s);",
+        (userid, movieid, rating)
+    )
+    cursor.execute(
+        f"SELECT COUNT(*) FROM pg_tables WHERE tablename LIKE '{RROBIN_TABLE_PREFIX.lower()}%';"
+    )
+    num_partitions = cursor.fetchone()[0]
+    if num_partitions == 0:
+        openconnection.commit()
+        return
+    total_rows = 0
+    for i in range(num_partitions):
+        part_table = f"{RROBIN_TABLE_PREFIX}{i}"
+        cursor.execute(f"SELECT COUNT(*) FROM {part_table};")
+        count = cursor.fetchone()[0]
+        total_rows += count
+    next_partition_index = total_rows % num_partitions
+    target_partition_table = f"{RROBIN_TABLE_PREFIX}{next_partition_index}"
+    cursor.execute(
+        f"INSERT INTO {target_partition_table} (UserID, MovieID, Rating) VALUES (%s, %s, %s);",
+        (userid, movieid, rating)
+    )
+    openconnection.commit()
+
 
 if __name__ == "__main__":
-    print("")
+    print("Running database partitioning functions directly for testing...")
 
