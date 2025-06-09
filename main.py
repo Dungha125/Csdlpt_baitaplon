@@ -26,7 +26,7 @@ def getopenconnection(user=DB_USER_PG_DEFAULT, password=DB_PASS_PG_DEFAULT, dbna
         conn = psycopg2.connect(dbname=dbname, user=user, password=password, host=host, port=port)
         return conn
     except psycopg2.Error as e:
-        print(f"🚫 Lỗi kết nối đến PostgreSQL: {e}")
+        print(f"Lỗi kết nối đến PostgreSQL: {e}")
         raise
 
 def _execute_query_pg_with_provided_conn(conn, query, params=None, fetch=False):
@@ -41,7 +41,7 @@ def _execute_query_pg_with_provided_conn(conn, query, params=None, fetch=False):
             elif fetch == 'all':
                 result = cur.fetchall()
     except psycopg2.Error as e:
-        print(f"🚫 Lỗi SQL (PostgreSQL) trong _execute_query_pg_with_provided_conn: {e}")
+        print(f"Lỗi SQL trong _execute_query_pg_with_provided_conn: {e}")
         print(f"  Truy vấn thất bại: {query}")
         if params: print(f"  Tham số: {params}")
         if not conn.autocommit and conn.status == psycopg2.extensions.STATUS_IN_ERROR:
