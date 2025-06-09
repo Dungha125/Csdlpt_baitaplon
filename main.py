@@ -261,6 +261,32 @@ def rangeinsert(ratingsTableName, userid, movieid, rating, openconnection):
                 pass
         raise
 
+def roundrobininsert(ratingsTableName, userid, movieid, rating, openconnection):
+    cursor = openconnection.cursor()
+    cursor.execute(
+        f"INSERT INTO {ratingsTableName} (UserID, MovieID, Rating) VALUES (%s, %s, %s);",
+        (userid, movieid, rating)
+    )
+    cursor.execute(
+        f"SELECT COUNT(*) FROM pg_tables WHERE tablename LIKE '{RROBIN_TABLE_PREFIX.lower()}%';"
+    )
+    num_partitions = cursor.fetchone()[0]
+    if num_partitions == 0:
+        openconnection.commit()
+        return
+    total_rows = 0
+    for i in range(num_partitions):
+        part_table = f"{RROBIN_TABLE_PREFIX}{i}"
+        cursor.execute(f"SELECT COUNT(*) FROM {part_table};")
+        count = cursor.fetchone()[0]
+        total_rows += count
+    next_partition_index = total_rows % num_partitions
+    target_partition_table = f"{RROBIN_TABLE_PREFIX}{next_partition_index}"
+    cursor.execute(
+        f"INSERT INTO {target_partition_table} (UserID, MovieID, Rating) VALUES (%s, %s, %s);",
+        (userid, movieid, rating)
+    )
+    openconnection.commit()
 
 if __name__ == "__main__":
     print("")
