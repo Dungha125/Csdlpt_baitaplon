@@ -1,7 +1,7 @@
 #
 # Tester for the assignement1
 #
-DATABASE_NAME = 'postgres'
+DATABASE_NAME = 'dds_assgn1'
 
 # TODO: Change these as per your code
 RATINGS_TABLE = 'ratings'

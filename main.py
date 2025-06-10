@@ -1,10 +1,10 @@
 import psycopg2
 import psycopg2.extras  
 
-
-DATABASE_NAME = 'postgres'  
+#Cau hinh SQL
+DATABASE_NAME = 'dds_assgn1'  
 DB_USER_PG_DEFAULT = 'postgres'
-DB_PASS_PG_DEFAULT = '12052004'
+DB_PASS_PG_DEFAULT = '1234'
 DB_HOST_PG_DEFAULT = 'localhost'
 DB_PORT_PG_DEFAULT = '5432'  
 
@@ -21,7 +21,12 @@ RATING_COLNAME = 'rating'
 MIN_RATING_CONST = 0.0
 MAX_RATING_CONST = 5.0
 
-def getopenconnection(user=DB_USER_PG_DEFAULT, password=DB_PASS_PG_DEFAULT, dbname=DATABASE_NAME, host=DB_HOST_PG_DEFAULT, port=DB_PORT_PG_DEFAULT):
+def getopenconnection(
+    user=DB_USER_PG_DEFAULT, 
+    password=DB_PASS_PG_DEFAULT, 
+    dbname=DATABASE_NAME, 
+    host=DB_HOST_PG_DEFAULT, 
+    port=DB_PORT_PG_DEFAULT):
     try:
         conn = psycopg2.connect(dbname=dbname, user=user, password=password, host=host, port=port)
         return conn
@@ -45,7 +50,7 @@ def _execute_query_pg_with_provided_conn(conn, query, params=None, fetch=False):
         print(f"  Truy vấn thất bại: {query}")
         if params: print(f"  Tham số: {params}")
         if not conn.autocommit and conn.status == psycopg2.extensions.STATUS_IN_ERROR:
-            print("  INFO: Đang cố gắng rollback do lỗi (không ở chế độ autocommit)...")
+            print("  Đang cố gắng rollback do lỗi...")
             try:
                 conn.rollback()
             except psycopg2.Error as rb_err:
@@ -57,7 +62,7 @@ def create_db_if_not_exists(dbname):
     print(f"Đảm bảo cơ sở dữ liệu '{dbname}' tồn tại...")
     conn_default = None
     try:
-        conn_default = getopenconnection(dbname='postgres')
+        conn_default = getopenconnection(dbname='dds_assgn1')
         conn_default.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
         cur = conn_default.cursor()
 
