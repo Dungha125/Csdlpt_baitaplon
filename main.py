@@ -255,7 +255,6 @@ def rangeinsert(ratingsTableName, userid, movieid, rating, openconnection):
                 pass
         raise
 
-
 def roundrobininsert(ratingsTableName, userid, movieid, rating, openconnection):
     cursor = openconnection.cursor()
     cursor.execute(
@@ -282,7 +281,6 @@ def roundrobininsert(ratingsTableName, userid, movieid, rating, openconnection):
         (userid, movieid, rating)
     )
     openconnection.commit()
-
 
 if __name__ == "__main__":
     print("Running database partitioning functions directly for testing...")
