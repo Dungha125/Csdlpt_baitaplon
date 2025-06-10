@@ -7,3 +7,7 @@ public cho repository này.
 - Trình bày và giải thích cách giải quyết vấn đề
 - Phân chia công việc giữa các thành viên trong nhóm
 5. Hạn nộp bài: thứ Bảy 10/6/2025
+
+===============================================
+Trong file main, chi thay doi phan cau hinh SQL:
+![alt text](image.png)
